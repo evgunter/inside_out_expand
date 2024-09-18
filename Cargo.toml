@@ -1,0 +1,15 @@
+[package]
+name = "inside_out_expand"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+
+[[test]]
+name = "integration_tests"
+path = "tests/src/run_integration_tests.rs"
+harness = false
