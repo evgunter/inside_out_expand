@@ -1,0 +1,14 @@
+error: no rules expected `macro_b_to_a`
+  --> compile_fail/double_depth_original.rs:14:29
+   |
+ 1 | macro_rules! macro_a_to_end {
+   | --------------------------- when calling this macro
+...
+14 |     let _ = macro_a_to_end!(macro_b_to_a!("b" "q") "z");
+   |                             ^^^^^^^^^^^^ no rules expected this token in macro call
+   |
+note: while trying to match `"a"`
+  --> compile_fail/double_depth_original.rs:2:6
+   |
+ 2 |     ("a" $body:expr) => {
+   |      ^^^
