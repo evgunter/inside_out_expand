@@ -84,3 +84,75 @@ fn bracket_delimiters() {
     // macros invoked with square brackets should also work
     assert_eq!(inside_out_expand!(macro_a_to_end!["a" "q"]), "q");
 }
+
+// --- Path-qualified macro invocation tests ---
+
+#[test]
+fn path_qualified_single() {
+    // basic path-qualified macro: std::concat!
+    assert_eq!(inside_out_expand!(std::concat!("a", "b")), "ab");
+}
+
+#[test]
+fn path_qualified_nested_both() {
+    // both outer and inner macros are path-qualified
+    assert_eq!(
+        inside_out_expand!(std::concat!(std::stringify!(hello), " world")),
+        "hello world"
+    );
+}
+
+#[test]
+fn path_qualified_outer_only() {
+    // path-qualified outer, unqualified inner
+    assert_eq!(
+        inside_out_expand!(std::concat!(stringify!(hello), " world")),
+        "hello world"
+    );
+}
+
+#[test]
+fn path_qualified_inner_only() {
+    // unqualified outer, path-qualified inner
+    assert_eq!(
+        inside_out_expand!(concat!(std::stringify!(hello), " world")),
+        "hello world"
+    );
+}
+
+#[test]
+fn path_qualified_with_user_macro() {
+    // path-qualified std macro wrapping a user-defined macro
+    assert_eq!(
+        inside_out_expand!(std::concat!(macro_b_to_a!("b" "q"), " end")),
+        "a end"
+    );
+}
+
+#[test]
+fn path_qualified_deeply_nested() {
+    // three levels of nesting with path-qualified macros
+    assert_eq!(
+        inside_out_expand!(std::concat!(std::concat!(std::stringify!(hi), " "), "world")),
+        "hi world"
+    );
+}
+
+#[test]
+fn path_qualified_core_crate() {
+    // using core:: path instead of std::
+    assert_eq!(inside_out_expand!(core::concat!("x", "y")), "xy");
+}
+
+#[test]
+fn path_qualified_ignore_expansion_failure() {
+    // path-qualified inner macro with non-literal outer macro in ignore mode
+    let d = inside_out_expand_ignore_expansion_failure!(macro_nonlit_out!(std::concat!("a", "b")));
+    assert_eq!(d, "ab");
+}
+
+#[test]
+fn path_qualified_bracket_delimiters() {
+    // path-qualified macro with square bracket delimiters
+    assert_eq!(inside_out_expand!(std::concat!["a", "b"]), "ab");
+}

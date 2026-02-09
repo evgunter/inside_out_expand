@@ -13,6 +13,52 @@ pub fn inside_out_expand_ignore_expansion_failure(input: TokenStream) -> TokenSt
     inside_out_expand_inner(input, true)
 }
 
+/// Pops a macro path from the end of the token vector.
+/// Handles simple identifiers (e.g., `stringify`) and path-qualified names
+/// (e.g., `std::stringify`, `::std::stringify`).
+fn pop_macro_path(tokens: &mut Vec<TokenTree2>) -> Vec<TokenTree2> {
+    let macro_ident = match tokens.pop() {
+        Some(TokenTree2::Ident(ident)) => ident,
+        _ => panic!("Expected an identifier before '!' in macro invocation")
+    };
+
+    // Collect path tokens in reverse order, then reverse at the end
+    let mut path_tokens: Vec<TokenTree2> = vec![TokenTree2::Ident(macro_ident)];
+
+    loop {
+        let len = tokens.len();
+        if len < 2 {
+            break;
+        }
+        // Check if the last two tokens form `::`
+        let is_path_sep = matches!(
+            (&tokens[len - 2], &tokens[len - 1]),
+            (TokenTree2::Punct(p1), TokenTree2::Punct(p2))
+            if p1.as_char() == ':' && p2.as_char() == ':'
+        );
+        if !is_path_sep {
+            break;
+        }
+        // Pop the `::`
+        path_tokens.push(tokens.pop().unwrap());
+        path_tokens.push(tokens.pop().unwrap());
+
+        // Check if there's a preceding Ident (path segment)
+        match tokens.last() {
+            Some(TokenTree2::Ident(_)) => {
+                path_tokens.push(tokens.pop().unwrap());
+            }
+            _ => {
+                // Leading `::` with no preceding ident; stop
+                break;
+            }
+        }
+    }
+
+    path_tokens.reverse();
+    path_tokens
+}
+
 /// Maximum number of expansion passes, mirroring the compiler's default recursion_limit of 128.
 const EXPANSION_LIMIT: usize = 128;
 
@@ -40,11 +86,10 @@ fn inside_out_expand_inner(input: TokenStream, ignore_failed_macro_expansion: bo
                                 let inner_expanded = inside_out_expand(group.stream().into()).into();
 
                                 // then expand the current macro invocation
-                                let current_macro_ident = match current_pass_new.pop() {
-                                    Some(TokenTree2::Ident(ident)) => ident,
-                                    _ => panic!("Expected an identifier at the end of current_pass_new")
-                                };
-                                let current_invocation: TokenStream = TokenStream2::from_iter(vec![TokenTree2::Ident(current_macro_ident), TokenTree2::Punct(punct), TokenTree2::Group(Group::new(group.delimiter(), inner_expanded))]).into();
+                                let mut macro_path = pop_macro_path(&mut current_pass_new);
+                                macro_path.push(TokenTree2::Punct(punct));
+                                macro_path.push(TokenTree2::Group(Group::new(group.delimiter(), inner_expanded)));
+                                let current_invocation: TokenStream = TokenStream2::from_iter(macro_path).into();
                                 let current_expanded: TokenStream2 = match current_invocation.expand_expr() {
                                     Ok(expanded) => {
                                         expansion_performed = true;
