@@ -1,0 +1,7 @@
+error: proc macro panicked
+  --> compile_fail/dont_ignore_failed_expansion.rs:19:13
+   |
+19 |     let _ = inside_out_expand!(macro_nonlit_out!(macro_a_to_end!("a" "q")));
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: message: Error expanding macro invocation: macro expansion failed

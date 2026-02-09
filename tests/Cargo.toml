@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-tempfile = "3"
+trybuild = "1.0"
 inside_out_expand = { path = ".." }
