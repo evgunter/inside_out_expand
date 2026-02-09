@@ -1,4 +1,3 @@
-#![feature(extend_one)]
 #![feature(proc_macro_expand)]
 
 use proc_macro::TokenStream;
@@ -14,11 +13,14 @@ pub fn inside_out_expand_ignore_expansion_failure(input: TokenStream) -> TokenSt
     inside_out_expand_inner(input, true)
 }
 
+/// Maximum number of expansion passes, mirroring the compiler's default recursion_limit of 128.
+const EXPANSION_LIMIT: usize = 128;
+
 fn inside_out_expand_inner(input: TokenStream, ignore_failed_macro_expansion: bool) -> TokenStream {
     // takes macro invocations in the input and expands the most deeply nested macro invocations first
     // (with ties being broken by expanding the leftmost macro invocation first)
     let mut current_tokens: TokenStream2 = input.into();
-    loop {
+    for _ in 0..EXPANSION_LIMIT {
         let mut expansion_performed = false;
         let mut current_pass_new: Vec<TokenTree2> = Vec::new();
         let mut current_pass_remaining = current_tokens.into_iter();
@@ -60,10 +62,10 @@ fn inside_out_expand_inner(input: TokenStream, ignore_failed_macro_expansion: bo
                             _ => panic!("Expected a group after a '!' in the input")
                         }
                     } else {
-                        current_pass_new.extend_one(TokenTree2::Punct(punct));
+                        current_pass_new.push(TokenTree2::Punct(punct));
                     }
                 }
-                v => current_pass_new.extend_one(v),
+                v => current_pass_new.push(v),
             }
         }
         if !expansion_performed {
@@ -71,4 +73,5 @@ fn inside_out_expand_inner(input: TokenStream, ignore_failed_macro_expansion: bo
         }
         current_tokens = current_pass_new.into_iter().collect::<TokenStream2>();
     }
+    panic!("inside_out_expand: expansion limit of {} reached, possible infinite macro expansion", EXPANSION_LIMIT);
 }
