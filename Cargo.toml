@@ -2,6 +2,9 @@
 name = "inside_out_expand"
 version = "0.1.0"
 edition = "2021"
+description = "Proc macros that expand nested macro invocations inside-out instead of outside-in"
+license = "MIT"
+repository = "https://github.com/evgunter/inside_out_expand"
 
 [lib]
 proc-macro = true

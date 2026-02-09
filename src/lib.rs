@@ -3,11 +3,34 @@
 use proc_macro::TokenStream;
 use proc_macro2::{Group, TokenTree as TokenTree2, TokenStream as TokenStream2};
 
+/// Expands nested macro invocations inside-out instead of Rust's default outside-in order.
+///
+/// Repeatedly expands the most deeply nested macro invocation first (breaking ties
+/// left-to-right) until no macro invocations remain. Both simple (`stringify!`)
+/// and path-qualified (`std::stringify!`) invocations are supported.
+///
+/// Requires nightly: uses the `proc_macro_expand` feature, which only supports
+/// macros that expand to a literal. Panics if a macro does not produce a literal.
+///
+/// # Example
+/// ```ignore
+/// // Without inside_out_expand, macro_a_to_end receives the unexpanded
+/// // macro_b_to_a!(...) invocation and fails to match its pattern.
+/// // With inside_out_expand, macro_b_to_a is expanded first.
+/// let result = inside_out_expand!(macro_a_to_end!(macro_b_to_a!("b" "q") "z"));
+/// assert_eq!(result, "z");
+/// ```
 #[proc_macro]
 pub fn inside_out_expand(input: TokenStream) -> TokenStream {
     inside_out_expand_inner(input, false)
 }
 
+/// Like [`inside_out_expand`], but skips macros that don't produce a literal
+/// instead of panicking.
+///
+/// This is useful when the input contains a mix of literal-producing macros
+/// (which will be expanded) and non-literal macros (which will be left as-is
+/// for the compiler to expand normally).
 #[proc_macro]
 pub fn inside_out_expand_ignore_expansion_failure(input: TokenStream) -> TokenStream {
     inside_out_expand_inner(input, true)
