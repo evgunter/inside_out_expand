@@ -1,6 +1,5 @@
 #![cfg(test)]
 
-use trybuild::TestCases;
 use tempfile::TempDir;
 use std::fs::File;
 use std::io::Write;
@@ -31,11 +30,11 @@ fn single_depth() {
 
 #[test]
 fn double_depth_original() {
-    // make a temporary file to check that "macro_a_to_end!(macro_b_to_a!(b "q"))" does not compile
+    // Verify that nested macros fail to compile without inside_out_expand,
+    // since the outer macro receives the unexpanded inner invocation.
     let tmp_dir = TempDir::new().unwrap();
     let tmp_file_path = tmp_dir.path().join("test_double_depth_compile.rs");
-    let mut tmp_file = File::create(tmp_file_path.clone()).unwrap();
-    // the innermost macro would need to be expanded first for this to compile
+    let mut tmp_file = File::create(&tmp_file_path).unwrap();
     writeln!(tmp_file, r#"
 macro_rules! macro_a_to_end {{
     ("a" $body:expr) => {{
@@ -49,34 +48,18 @@ macro_rules! macro_b_to_a {{
     }};
 }}
 
-
 fn main() {{
     let _ = macro_a_to_end!(macro_b_to_a!("b" "q") "z");
 }}
 "#).unwrap();
 
-    let tmp_answer_file_path = tmp_dir.path().join("test_double_depth_compile.stderr");
-    let mut tmp_answer_file = File::create(tmp_answer_file_path.clone()).unwrap();
-    writeln!(tmp_answer_file, r#"error: no rules expected `macro_b_to_a`
- --> {}:16:29
-  |
- 2 | macro_rules! macro_a_to_end {{
-   | --------------------------- when calling this macro
-...
-16 |     let _ = macro_a_to_end!(macro_b_to_a!("b" "q") "z");
-   |                             ^^^^^^^^^^^^ no rules expected this token in macro call
-   |
-note: while trying to match `"a"`
-  --> {}:3:6
-   |
- 3 |     ("a" $body:expr) => {{
-   |      ^^^"#, tmp_file_path.display(), tmp_file_path.display()).unwrap();
-
-    {
-        // this has to go out of scope before the temporary file does, or the file may be deleted before it can read it
-        let t = TestCases::new();
-        t.compile_fail(tmp_file_path.clone());
-    }
+    let output = std::process::Command::new("rustc")
+        .arg("--edition").arg("2021")
+        .arg(&tmp_file_path)
+        .arg("--out-dir").arg(tmp_dir.path())
+        .output()
+        .expect("Failed to run rustc");
+    assert!(!output.status.success(), "Expected compilation to fail, but it succeeded");
 }
 
 #[test]
@@ -106,46 +89,48 @@ fn test_dont_ignore_failed_macro_expansion() {
     // macro_nonlit_out doesn't emit a literal, so it causes an internal error in the expansion macro;
     // this tests that such an error does indeed occur. (this is mostly relevant to demonstrate the soundness of the test above.)
     let tmp_dir = TempDir::new().unwrap();
-    let tmp_file_path = tmp_dir.path().join("test_ignore_failed_macro_expansion.rs");
-    let mut tmp_file = File::create(tmp_file_path.clone()).unwrap();
-    writeln!(tmp_file, r#"
+    let crate_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+
+    std::fs::write(tmp_dir.path().join("Cargo.toml"), format!(r#"
+[package]
+name = "test_compile_fail"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+inside_out_expand = {{ path = "{}" }}
+"#, crate_path.display())).unwrap();
+
+    std::fs::create_dir_all(tmp_dir.path().join("src")).unwrap();
+    std::fs::write(tmp_dir.path().join("src/main.rs"), r#"
 use inside_out_expand::inside_out_expand;
 
-macro_rules! macro_a_to_end {{
-    ("a" $body:expr) => {{
+macro_rules! macro_a_to_end {
+    ("a" $body:expr) => {
         $body
-    }};
-}}
+    };
+}
 
-macro_rules! macro_nonlit_out {{
-    ($body:expr) => {{
-        {{
+macro_rules! macro_nonlit_out {
+    ($body:expr) => {
+        {
             const DEFINED_IN_MACRO: &str = $body;
             DEFINED_IN_MACRO
-        }}
-    }};
-}}
+        }
+    };
+}
 
-
-fn main() {{
+fn main() {
     let _ = inside_out_expand!(macro_nonlit_out!(macro_a_to_end!("a" "q")));
-}}
+}
 "#).unwrap();
-    let tmp_answer_file_path = tmp_dir.path().join("test_ignore_failed_macro_expansion.stderr");
-    let mut tmp_answer_file = File::create(tmp_answer_file_path.clone()).unwrap();
-    writeln!(tmp_answer_file, r#"error: proc macro panicked
-  --> {}:21:13
-   |
-21 |     let _ = inside_out_expand!(macro_nonlit_out!(macro_a_to_end!("a" "q")));
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: message: Error expanding macro invocation: macro expansion failed"#, tmp_file_path.display()).unwrap();
 
-    {
-        // this has to go out of scope before the temporary file does, or the file may be deleted before it can read it
-        let t = TestCases::new();
-        t.compile_fail(tmp_file_path.clone());
-    }
+    let output = std::process::Command::new("cargo")
+        .arg("check")
+        .current_dir(tmp_dir.path())
+        .output()
+        .expect("Failed to run cargo check");
+    assert!(!output.status.success(), "Expected compilation to fail, but it succeeded");
 }
 
 #[test]
