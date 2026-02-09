@@ -57,10 +57,10 @@ fn main() {{
 
     let tmp_answer_file_path = tmp_dir.path().join("test_double_depth_compile.stderr");
     let mut tmp_answer_file = File::create(tmp_answer_file_path.clone()).unwrap();
-    writeln!(tmp_answer_file, r#"error: no rules expected the token `macro_b_to_a`
-  --> {}:16:29
-   |
-2  | macro_rules! macro_a_to_end {{
+    writeln!(tmp_answer_file, r#"error: no rules expected `macro_b_to_a`
+ --> {}:16:29
+  |
+ 2 | macro_rules! macro_a_to_end {{
    | --------------------------- when calling this macro
 ...
 16 |     let _ = macro_a_to_end!(macro_b_to_a!("b" "q") "z");
@@ -69,16 +69,8 @@ fn main() {{
 note: while trying to match `"a"`
   --> {}:3:6
    |
-3  |     ("a" $body:expr) => {{
-   |      ^^^
-
-warning: unused macro definition: `macro_b_to_a`
- --> {}:8:14
-  |
-8 | macro_rules! macro_b_to_a {{
-  |              ^^^^^^^^^^^^
-  |
-  = note: `#[warn(unused_macros)]` on by default"#, tmp_file_path.display(), tmp_file_path.display(), tmp_file_path.display()).unwrap();
+ 3 |     ("a" $body:expr) => {{
+   |      ^^^"#, tmp_file_path.display(), tmp_file_path.display()).unwrap();
 
     {
         // this has to go out of scope before the temporary file does, or the file may be deleted before it can read it
