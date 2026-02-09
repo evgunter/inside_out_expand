@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 trybuild = "1.0"
-tempdir = "0"
+tempfile = "3"
 inside_out_expand = { path = ".." }

@@ -1,7 +1,6 @@
 #![feature(extend_one)]
 #![feature(proc_macro_expand)]
 
-use core::panic;
 use proc_macro::TokenStream;
 use proc_macro2::{Group, TokenTree as TokenTree2, TokenStream as TokenStream2};
 
@@ -15,7 +14,7 @@ pub fn inside_out_expand_ignore_expansion_failure(input: TokenStream) -> TokenSt
     inside_out_expand_inner(input, true)
 }
 
-fn inside_out_expand_inner(input: TokenStream, ignore_faled_macro_expansion: bool) -> TokenStream {
+fn inside_out_expand_inner(input: TokenStream, ignore_failed_macro_expansion: bool) -> TokenStream {
     // takes macro invocations in the input and expands the most deeply nested macro invocations first
     // (with ties being broken by expanding the leftmost macro invocation first)
     let mut current_tokens: TokenStream2 = input.into();
@@ -49,14 +48,14 @@ fn inside_out_expand_inner(input: TokenStream, ignore_faled_macro_expansion: boo
                                         expansion_performed = true;
                                         expanded
                                     },
-                                    Err(e) => if ignore_faled_macro_expansion {
+                                    Err(e) => if ignore_failed_macro_expansion {
                                         // in this case, leave the macro invocation unexpanded. since expand_expr only supports expansion into a literal, this can be convenient if multiple kinds of macros are being used.
                                         current_invocation
                                     } else {
                                         panic!("Error expanding macro invocation: {}", e)
                                     }
                                 }.into();
-                                current_pass_new.extend(current_expanded.into_iter().collect::<Vec<TokenTree2>>());
+                                current_pass_new.extend(current_expanded);
                             }
                             _ => panic!("Expected a group after a '!' in the input")
                         }
